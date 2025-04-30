@@ -1,0 +1,63 @@
+version: '3.1'
+services:
+  giz-init:
+    command: sh -c 'until pg_isready -h giz-postgres -p 5432; do sleep 1; done;'
+    container_name: giz-init
+    depends_on:
+      - giz-postgres
+    image: postgres:16
+    networks:
+      - giz
+  
+  giz-app:
+    build:
+      context: ./
+    container_name: giz-app
+    environment:
+      APP_NAME: giz
+      APP_KEY: base64:8uFPUyab0Hc5yVRnMXxV2c3lOfRBN1LsDCoL9RlR+k8=
+      DB_CONNECTION: pgsql
+      DB_HOST: giz-postgres
+      DB_DATABASE: giz
+      DB_USERNAME: giz
+      DB_PASSWORD: giz
+      CACHE_DRIVER: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: redis
+      REDIS_HOST: giz-redis
+    depends_on:
+      - giz-init
+      - giz-postgres
+      - giz-redis
+    networks:
+      - giz
+    ports:
+      - 8880:80
+    restart: unless-stopped
+
+  giz-postgres:
+    container_name: giz-postgres
+    environment:
+      POSTGRES_DB: "giz"
+      POSTGRES_USER: "giz"
+      POSTGRES_PASSWORD: "giz"
+    image: postgres:16
+    networks:
+      - giz
+    restart: unless-stopped
+    volumes:
+      - ./.data/postgres:/var/lib/postgresql/data
+
+  giz-redis:
+    container_name: giz-redis
+    image: redis:7
+    networks:
+      - giz
+    restart: unless-stopped
+    volumes:
+      - ./.data/redis:/data
+
+networks:
+  giz:
+    driver: bridge
+    name: giz

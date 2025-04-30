@@ -1,0 +1,83 @@
+name: production
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          push: ${{ github.ref == 'refs/heads/master' }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Install kubectl
+        run: |
+          curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+          chmod +x ./kubectl
+          sudo mv ./kubectl /usr/local/bin/kubectl
+
+      - name: Configure kubectl
+        env:
+          K8S_PRODUCTION_URL: ${{ secrets.K8S_PRODUCTION_URL }}
+          K8S_PRODUCTION_USER: ${{ secrets.K8S_PRODUCTION_USER }}
+          K8S_PRODUCTION_TOKEN: ${{ secrets.K8S_PRODUCTION_TOKEN }}
+          K8S_PRODUCTION_NAMESPACE: ${{ secrets.K8S_PRODUCTION_NAMESPACE }}
+        run: |
+          kubectl config set-cluster k8s --server="$K8S_PRODUCTION_URL" --insecure-skip-tls-verify=true
+          kubectl config set-credentials "$K8S_PRODUCTION_USER" --token="$K8S_PRODUCTION_TOKEN"
+          kubectl config set-context default --cluster=k8s --user="$K8S_PRODUCTION_USER" --namespace="$K8S_PRODUCTION_NAMESPACE"
+          kubectl config use-context default
+
+      - name: Update Kubernetes deployments
+        env:
+          REPO_PATH: ghcr.io/${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          kubectl set image cronjob/giz-demoapp-digital-app-cj giz-demoapp-digital-app-cj=$REPO_PATH:$GITHUB_SHA
+          kubectl set image deployment/giz-demoapp-digital-app-deploy giz-demoapp-digital-app=$REPO_PATH:$GITHUB_SHA
+          kubectl set image deployment/giz-demoapp-digital-app-deploy giz-demoapp-digital-app-init=$REPO_PATH:$GITHUB_SHA
+          kubectl set image deployment/giz-demoapp-digital-worker-deploy giz-demoapp-digital-worker=$REPO_PATH:$GITHUB_SHA
+          kubectl set image deployment/giz-demoapp-digital-pulse-deploy giz-demoapp-digital-pulse=$REPO_PATH:$GITHUB_SHA
