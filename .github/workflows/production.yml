@@ -76,8 +76,8 @@ jobs:
           REPO_PATH: ghcr.io/${{ github.repository }}
           GITHUB_SHA: ${{ github.sha }}
         run: |
-          kubectl set image cronjob/giz-demoapp-digital-app-cj giz-demoapp-digital-app-cj=$REPO_PATH:$GITHUB_SHA
-          kubectl set image deployment/giz-demoapp-digital-app-deploy giz-demoapp-digital-app=$REPO_PATH:$GITHUB_SHA
-          kubectl set image deployment/giz-demoapp-digital-app-deploy giz-demoapp-digital-app-init=$REPO_PATH:$GITHUB_SHA
-          kubectl set image deployment/giz-demoapp-digital-worker-deploy giz-demoapp-digital-worker=$REPO_PATH:$GITHUB_SHA
-          kubectl set image deployment/giz-demoapp-digital-pulse-deploy giz-demoapp-digital-pulse=$REPO_PATH:$GITHUB_SHA
+          kubectl set image cronjob/whatsapp-fennecfoxta-com-app-cj whatsapp-fennecfoxta-com-app-cj=$REPO_PATH:$GITHUB_SHA
+          kubectl set image deployment/whatsapp-fennecfoxta-com-app-deploy whatsapp-fennecfoxta-com-app=$REPO_PATH:$GITHUB_SHA
+          kubectl set image deployment/whatsapp-fennecfoxta-com-app-deploy whatsapp-fennecfoxta-com-app-init=$REPO_PATH:$GITHUB_SHA
+          kubectl set image deployment/whatsapp-fennecfoxta-com-worker-deploy whatsapp-fennecfoxta-com-worker=$REPO_PATH:$GITHUB_SHA
+          kubectl set image deployment/whatsapp-fennecfoxta-com-pulse-deploy whatsapp-fennecfoxta-com-pulse=$REPO_PATH:$GITHUB_SHA
