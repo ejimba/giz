@@ -12,10 +12,7 @@ class UserObserver
     {
         $user->email = Str::lower($user->email);
         if ($user->phone) {
-            if (!$user->phone_country) {
-                $user->phone_country = 'ke';
-            }
-            $user->phone = (new PhoneNumber($user->phone, $user->phone_country))->formatE164();
+            $user->phone = (new PhoneNumber($user->phone))->formatE164();
         }
     }
 
@@ -23,7 +20,7 @@ class UserObserver
     {
         $user->email = Str::lower($user->email);
         if ($user->isDirty('phone')) {
-            $user->phone = (new PhoneNumber($user->phone, $user->phone_country))->formatE164();
+            $user->phone = (new PhoneNumber($user->phone))->formatE164();
         }
     }
 }

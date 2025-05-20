@@ -97,26 +97,20 @@ class TwilioWebhookController extends Controller
                 'status' => $messageStatus,
                 'payload' => $request->all(),
             ]);
-            
-            // Update the message status in our database
-            $outgoingMessage = OutgoingMessage::where('twilio_message_sid', $messageSid)->first();
+            $outgoingMessage = OutgoingMessage::where('provider_id', $messageSid)->first();
             
             if ($outgoingMessage) {
-                $outgoingMessage->status = $messageStatus;
-                $outgoingMessage->status_date = now();
                 $outgoingMessage->metadata = array_merge((array) $outgoingMessage->metadata, [
                     'status_callback' => $request->all(),
                 ]);
                 $outgoingMessage->save();
             }
-            
             return response()->noContent();
         } catch (\Exception $e) {
             Log::error('Error processing Twilio status callback', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
             return response()->json(['error' => 'Failed to process status callback'], 500);
         }
     }

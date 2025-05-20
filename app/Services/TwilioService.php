@@ -83,14 +83,11 @@ class TwilioService
                 'message_id' => $message->id,
                 'error' => $e->getMessage(),
             ]);
-
-            $message->status = 'failed';
-            $message->status_date = now();
+            $message->processed_at = now();
             $message->metadata = array_merge((array) $message->metadata, [
                 'error' => $e->getMessage(),
             ]);
             $message->save();
-
             throw $e;
         }
     }
