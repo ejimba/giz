@@ -6,13 +6,11 @@ use Filament\Pages\Page;
 
 class Settings extends Page
 {
-    protected static ?int $navigationSort = 13;
-
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
 
     protected static string $view = 'filament.pages.settings';
 
-    protected static ?string $navigationGroup = 'Admin';
+    protected static ?int $navigationSort = 7;
 
     public static function canAccess(): bool
     {

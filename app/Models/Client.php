@@ -15,8 +15,9 @@ class Client extends Model
     protected $table = 'clients';
 
     protected $fillable = [
-        'phone',
         'name',
+        'email',
+        'phone',
         'status',
         'metadata',
     ];
@@ -24,20 +25,28 @@ class Client extends Model
     protected $casts = [
         'metadata' => 'array',
     ];
-
+    
     /**
-     * Get all incoming messages for this client
+     * Get all conversations for this client
      */
-    public function incomingMessages(): HasMany
+    public function conversations(): HasMany
     {
-        return $this->hasMany(IncomingMessage::class);
+        return $this->hasMany(Conversation::class);
     }
-
+    
     /**
-     * Get all outgoing messages for this client
+     * Get the active conversation for this client, if any
      */
-    public function outgoingMessages(): HasMany
+    public function activeConversation()
     {
-        return $this->hasMany(OutgoingMessage::class, 'phone', 'phone');
+        return $this->conversations()->where('status', 'active')->latest()->first();
+    }
+    
+    /**
+     * Get all responses from this client
+     */
+    public function responses(): HasMany
+    {
+        return $this->hasMany(Response::class);
     }
 }

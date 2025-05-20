@@ -16,10 +16,8 @@ class IncomingMessageResource extends Resource
     protected static ?string $model = IncomingMessage::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-chat-bubble-left-right';
-    
-    protected static ?string $navigationGroup = 'WhatsApp';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 3;
 
     public static function form(Form $form): Form
     {

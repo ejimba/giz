@@ -6,7 +6,6 @@ use App\Models\Client;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Flowframe\Trend\Trend;
-use Illuminate\Support\Facades\Schema;
 use Flowframe\Trend\TrendValue;
 use Illuminate\Support\Carbon;
 
@@ -14,7 +13,7 @@ class ClientsChart extends ChartWidget
 {
     use InteractsWithPageFilters;
 
-    protected static ?string $heading = 'SHR Clients';
+    protected static ?string $heading = 'Clients';
 
     protected function getData(): array
     {

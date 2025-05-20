@@ -14,13 +14,11 @@ use Illuminate\Database\Eloquent\Builder;
 
 class RoleResource extends Resource
 {
-    protected static ?int $navigationSort = 12;
-    
     protected static ?string $model = Role::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-user-circle';
-
-    protected static ?string $navigationGroup = 'Admin';
+    
+    protected static ?int $navigationSort = 6;
 
     public static function form(Form $form): Form
     {

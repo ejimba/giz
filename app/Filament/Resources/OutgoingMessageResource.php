@@ -16,13 +16,11 @@ use Illuminate\Database\Eloquent\Builder;
 
 class OutgoingMessageResource extends Resource
 {
-    protected static ?int $navigationSort = 7;
-
     protected static ?string $model = OutgoingMessage::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
 
-    protected static ?string $navigationGroup = 'WhatsApp';
+    protected static ?int $navigationSort = 4;
 
     protected static ?string $slug = 'outgoing-messages';
 

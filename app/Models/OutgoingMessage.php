@@ -15,39 +15,17 @@ class OutgoingMessage extends Model
     protected $table = 'outgoing_messages';
 
     protected $fillable = [
-        'id',
         'type',
-        'user_id',
-        'email',
-        'phone',
+        'provider_id',
+        'to',
         'subject',
         'message',
         'processed_at',
-        'status',
-        'status_date',
-        'twilio_message_sid',
         'metadata',
     ];
 
     protected $casts = [
         'processed_at' => 'datetime',
-        'status_date' => 'datetime',
         'metadata' => 'array',
     ];
-
-    /**
-     * Get the user that created the message
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-    
-    /**
-     * Get the client associated with this message
-     */
-    public function client()
-    {
-        return $this->belongsTo(Client::class, 'phone', 'phone');
-    }
 }

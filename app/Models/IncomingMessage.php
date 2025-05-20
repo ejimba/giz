@@ -15,27 +15,17 @@ class IncomingMessage extends Model
     protected $table = 'incoming_messages';
 
     protected $fillable = [
-        'client_id',
-        'twilio_message_sid',
-        'from_number',
+        'type',
+        'provider_id',
+        'from',
+        'subject',
         'message',
-        'media',
         'processed_at',
-        'status',
         'metadata',
     ];
 
     protected $casts = [
-        'media' => 'array',
         'metadata' => 'array',
         'processed_at' => 'datetime',
     ];
-
-    /**
-     * Get the client that owns the message
-     */
-    public function client(): BelongsTo
-    {
-        return $this->belongsTo(Client::class);
-    }
 }

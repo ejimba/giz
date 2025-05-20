@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Client;
 use App\Models\IncomingMessage;
 use App\Models\OutgoingMessage;
 use Illuminate\Support\Facades\Log;
@@ -32,29 +31,17 @@ class TwilioService
     public function processIncomingMessage(array $payload)
     {
         Log::info('Processing incoming WhatsApp message', ['payload' => $payload]);
-
-        // Get or create client
         $phoneNumber = $payload['From'] ?? null;
         if (!$phoneNumber) {
             throw new Exception('Phone number not found in payload');
         }
-
-        // Format phone number (remove whatsapp: prefix if present)
         $phoneNumber = str_replace('whatsapp:', '', $phoneNumber);
-
-        $client = Client::firstOrCreate(
-            ['phone' => $phoneNumber],
-            ['status' => 'active']
-        );
-
-        // Create incoming message
         $incomingMessage = IncomingMessage::create([
-            'client_id' => $client->id,
-            'twilio_message_sid' => $payload['MessageSid'] ?? null,
-            'from_number' => $phoneNumber,
+            'type' => 'whatsapp',
+            'provider_id' => $payload['MessageSid'] ?? null,
+            'from' => $phoneNumber,
+            'subject' => $payload['Subject'] ?? null,
             'message' => $payload['Body'] ?? '',
-            'media' => $this->extractMediaFromPayload($payload),
-            'status' => 'received',
             'metadata' => $payload,
         ]);
 
@@ -70,7 +57,7 @@ class TwilioService
     public function sendWhatsAppMessage(OutgoingMessage $message)
     {
         try {
-            $to = 'whatsapp:' . $message->phone;
+            $to = 'whatsapp:' . $message->to;
             $from = 'whatsapp:' . $this->fromNumber;
 
             $response = $this->client->messages->create($to, [
@@ -78,10 +65,11 @@ class TwilioService
                 'body' => $message->message,
             ]);
 
-            $message->twilio_message_sid = $response->sid;
-            $message->status = 'sent';
-            $message->status_date = now();
+            $message->provider_id = $response->sid;
             $message->processed_at = now();
+            $message->metadata = array_merge((array) $message->metadata, [
+                'twilio_response' => $response,
+            ]);
             $message->save();
 
             Log::info('WhatsApp message sent successfully', [

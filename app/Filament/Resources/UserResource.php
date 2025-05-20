@@ -17,13 +17,11 @@ use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
 {
-    protected static ?int $navigationSort = 11;
-
     protected static ?string $model = User::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-user-circle';
-
-    protected static ?string $navigationGroup = 'Admin';
+    
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {

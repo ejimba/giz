@@ -19,7 +19,6 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->timestamp('phone_verified_at')->nullable();
             $table->string('password')->nullable();
-            $table->string('phone_country')->nullable();
             $table->string('email_otp')->nullable();
             $table->string('phone_otp')->nullable();
             $table->boolean('phone_consent')->default(false)->index();

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Client;
 use App\Models\OutgoingMessage;
+use App\Services\ConversationService;
 use App\Services\TwilioService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -11,10 +13,12 @@ use Illuminate\Support\Facades\Log;
 class TwilioWebhookController extends Controller
 {
     protected $twilioService;
+    protected $conversationService;
 
-    public function __construct(TwilioService $twilioService)
+    public function __construct(TwilioService $twilioService, ConversationService $conversationService)
     {
         $this->twilioService = $twilioService;
+        $this->conversationService = $conversationService;
     }
 
     /**
@@ -31,9 +35,8 @@ class TwilioWebhookController extends Controller
             // Process the incoming message
             $incomingMessage = $this->twilioService->processIncomingMessage($request->all());
             
-            // Here you would typically process the message content
-            // For now, we'll just send a simple acknowledgment response
-            $this->sendAcknowledgmentResponse($incomingMessage);
+            // Process the message through our conversation flow system
+            $this->processConversationResponse($incomingMessage);
             
             return response()->noContent();
         } catch (\Exception $e) {
@@ -47,21 +50,33 @@ class TwilioWebhookController extends Controller
     }
     
     /**
-     * Send a simple acknowledgment response
-     * This is a placeholder for more complex message processing logic
+     * Process the incoming message through conversation flow system
      *
      * @param \App\Models\IncomingMessage $incomingMessage
      * @return void
      */
-    protected function sendAcknowledgmentResponse($incomingMessage)
+    protected function processConversationResponse($incomingMessage)
     {
+        $client = Client::firstOrCreate([
+            'phone' => $incomingMessage->from
+        ]);
+        $responseMessage = $this->conversationService->handleIncomingMessage(
+            $client,
+            $incomingMessage->message
+        );
         $outgoingMessage = OutgoingMessage::create([
             'type' => 'whatsapp',
-            'phone' => $incomingMessage->from_number,
-            'message' => "Thank you for your message. We have received: \"{$incomingMessage->message}\"",
-            'status' => 'pending',
+            'provider_id' => $incomingMessage->provider_id,
+            'to' => $incomingMessage->from,
+            'subject' => $incomingMessage->subject,
+            'message' => $responseMessage,
+            'processed_at' => null,
+            'metadata' => [
+                'conversation_id' => $incomingMessage->conversation_id,
+                'client_id' => $client->id,
+                'twilio_message_sid' => null,
+            ],
         ]);
-        
         $this->twilioService->sendWhatsAppMessage($outgoingMessage);
     }
     
