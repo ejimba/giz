@@ -10,16 +10,12 @@ return new class extends Migration
     {
         Schema::create('outgoing_messages', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('type')->index();
-            $table->uuid('user_id')->nullable()->index();
-            $table->string('email')->nullable();
-            $table->string('phone')->nullable();
+            $table->string('type')->nullable()->index();
+            $table->string('provider_id')->nullable()->index();
+            $table->string('to')->nullable()->index();
             $table->string('subject')->nullable();
             $table->text('message')->nullable();
             $table->dateTime('processed_at')->nullable();
-            $table->string('status')->nullable();
-            $table->dateTime('status_date')->nullable();
-            $table->string('twilio_message_sid')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
             $table->softDeletes();
