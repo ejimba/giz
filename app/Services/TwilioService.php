@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\IncomingMessage;
 use App\Models\OutgoingMessage;
+use App\Models\Client;
 use Illuminate\Support\Facades\Log;
 use Twilio\Rest\Client as TwilioClient;
 use Exception;
@@ -49,45 +50,64 @@ class TwilioService
     }
 
     /**
-     * Send a WhatsApp message via Twilio
+     * Send a WhatsApp message directly by phone number and content
      *
-     * @param OutgoingMessage $message
+     * @param string $phoneNumber
+     * @param string $messageContent
+     * @param array $metadata
      * @return OutgoingMessage
      */
-    public function sendWhatsAppMessage(OutgoingMessage $message)
+    public function sendWhatsAppMessage($phoneNumber, $messageContent, $metadata = [])
     {
         try {
-            $to = 'whatsapp:' . $message->to;
+            // Create an OutgoingMessage record
+            $outgoingMessage = OutgoingMessage::create([
+                'type' => 'whatsapp',
+                'to' => $phoneNumber,
+                'message' => $messageContent,
+                'processed_at' => null,
+                'metadata' => $metadata,
+            ]);
+            
+            // Clean the phone number (remove any non-numeric characters except +)
+            $phoneNumber = preg_replace('/[^0-9+]/', '', $phoneNumber);
+            
+            $to = 'whatsapp:' . $phoneNumber;
             $from = 'whatsapp:' . $this->fromNumber;
 
             $response = $this->client->messages->create($to, [
                 'from' => $from,
-                'body' => $message->message,
+                'body' => $messageContent,
             ]);
 
-            $message->provider_id = $response->sid;
-            $message->processed_at = now();
-            $message->metadata = array_merge((array) $message->metadata, [
+            $outgoingMessage->provider_id = $response->sid;
+            $outgoingMessage->processed_at = now();
+            $outgoingMessage->metadata = array_merge((array) $outgoingMessage->metadata, [
                 'twilio_response' => $response,
             ]);
-            $message->save();
+            $outgoingMessage->save();
 
             Log::info('WhatsApp message sent successfully', [
-                'message_id' => $message->id,
+                'message_id' => $outgoingMessage->id,
                 'twilio_sid' => $response->sid,
             ]);
 
-            return $message;
+            return $outgoingMessage;
         } catch (Exception $e) {
             Log::error('Failed to send WhatsApp message', [
-                'message_id' => $message->id,
+                'phone' => $phoneNumber,
                 'error' => $e->getMessage(),
             ]);
-            $message->processed_at = now();
-            $message->metadata = array_merge((array) $message->metadata, [
-                'error' => $e->getMessage(),
-            ]);
-            $message->save();
+            
+            // If we created an outgoing message record, update it with the error
+            if (isset($outgoingMessage)) {
+                $outgoingMessage->processed_at = now();
+                $outgoingMessage->metadata = array_merge((array) $outgoingMessage->metadata, [
+                    'error' => $e->getMessage(),
+                ]);
+                $outgoingMessage->save();
+            }
+            
             throw $e;
         }
     }

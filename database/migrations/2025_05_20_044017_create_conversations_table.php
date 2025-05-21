@@ -16,7 +16,7 @@ return new class extends Migration
             $table->uuid('client_id');
             $table->string('title')->nullable();
             $table->uuid('current_prompt_id')->nullable();
-            $table->enum('status', ['active', 'completed', 'abandoned'])->default('active');
+            $table->enum('status', ['active', 'completed', 'abandoned', 'error'])->default('active');
             $table->timestamp('started_at');
             $table->timestamp('completed_at')->nullable();
             $table->json('metadata')->nullable();

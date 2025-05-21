@@ -31,4 +31,9 @@ return [
         'token' => env('TWILIO_AUTH_TOKEN'),
         'whatsapp_number' => env('TWILIO_WHATSAPP_NUMBER'),
     ],
+    'endevstoves' => [
+        'url' => env('ENDEVSTOVES_API_URL'),
+        'username' => env('ENDEVSTOVES_USERNAME'),
+        'password' => env('ENDEVSTOVES_PASSWORD'),
+    ],
 ];

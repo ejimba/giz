@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Client;
+use App\Jobs\ProcessWhatsAppMessage;
+use App\Models\IncomingMessage;
 use App\Models\OutgoingMessage;
-use App\Services\ConversationService;
 use App\Services\TwilioService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -13,12 +13,9 @@ use Illuminate\Support\Facades\Log;
 class TwilioWebhookController extends Controller
 {
     protected $twilioService;
-    protected $conversationService;
 
-    public function __construct(TwilioService $twilioService, ConversationService $conversationService)
-    {
+    public function __construct(TwilioService $twilioService) {
         $this->twilioService = $twilioService;
-        $this->conversationService = $conversationService;
     }
 
     /**
@@ -32,12 +29,13 @@ class TwilioWebhookController extends Controller
         try {
             Log::info('Received webhook from Twilio', ['payload' => $request->all()]);
             
-            // Process the incoming message
+            // Process and save the incoming message
             $incomingMessage = $this->twilioService->processIncomingMessage($request->all());
             
-            // Process the message through our conversation flow system
-            $this->processConversationResponse($incomingMessage);
+            // Dispatch a job to process the message asynchronously
+            ProcessWhatsAppMessage::dispatch($incomingMessage->id);
             
+            // Return immediately with a 200 response to acknowledge receipt
             return response()->noContent();
         } catch (\Exception $e) {
             Log::error('Error processing Twilio webhook', [
@@ -45,40 +43,13 @@ class TwilioWebhookController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
             
-            return response()->json(['error' => 'Failed to process message'], 500);
+            // Even on error, return 200 to Twilio to prevent retries
+            // We'll handle retry logic in our queue
+            return response()->noContent();
         }
     }
     
-    /**
-     * Process the incoming message through conversation flow system
-     *
-     * @param \App\Models\IncomingMessage $incomingMessage
-     * @return void
-     */
-    protected function processConversationResponse($incomingMessage)
-    {
-        $client = Client::firstOrCreate([
-            'phone' => $incomingMessage->from
-        ]);
-        $responseMessage = $this->conversationService->handleIncomingMessage(
-            $client,
-            $incomingMessage->message
-        );
-        $outgoingMessage = OutgoingMessage::create([
-            'type' => 'whatsapp',
-            'provider_id' => $incomingMessage->provider_id,
-            'to' => $incomingMessage->from,
-            'subject' => $incomingMessage->subject,
-            'message' => $responseMessage,
-            'processed_at' => null,
-            'metadata' => [
-                'conversation_id' => $incomingMessage->conversation_id,
-                'client_id' => $client->id,
-                'twilio_message_sid' => null,
-            ],
-        ]);
-        $this->twilioService->sendWhatsAppMessage($outgoingMessage);
-    }
+    // The processing of messages is now handled by the ProcessWhatsAppMessage job
     
     /**
      * Handle status callbacks from Twilio
