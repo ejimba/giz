@@ -15,10 +15,13 @@ class PromptSeeder extends Seeder
     {
         $menuPrompt = Prompt::create([
             'title' => 'Sales Menu',
-            'content' => "Welcome to EndevStoves Sales System!\n\nSelect an option:\n1. Record a Sale",
+            'content' => "Welcome to EndevStoves Sales System!\n\nSelect an option:\n1. Record a Sale\n2. Check Stock Availability",
             'type' => 'multiple_choice',
             'metadata' => [
-                'options' => ['1' => 'Record a Sale'],
+                'options' => [
+                    '1' => 'Record a Sale', 
+                    '2' => 'Check Stock Availability'
+                ],
                 'is_sales_flow' => true
             ],
             'active' => true,
@@ -28,7 +31,7 @@ class PromptSeeder extends Seeder
         // Product selection prompt
         $productPrompt = Prompt::create([
             'title' => 'Product Selection',
-            'content' => "Select a product:",
+            'content' => "Select a product:\n\n0 - Go back\n00 - Main menu",
             'type' => 'multiple_choice',
             'metadata' => [
                 'step' => 'product_selection',
@@ -42,7 +45,7 @@ class PromptSeeder extends Seeder
         // Customer selection prompt
         $customerPrompt = Prompt::create([
             'title' => 'Customer Selection',
-            'content' => "Select a customer:",
+            'content' => "Select a customer:\n\n0 - Go back\n00 - Main menu",
             'type' => 'multiple_choice',
             'metadata' => [
                 'step' => 'customer_selection',
@@ -56,7 +59,7 @@ class PromptSeeder extends Seeder
         // Staff selection prompt
         $staffPrompt = Prompt::create([
             'title' => 'Staff Selection',
-            'content' => "Select a staff member:",
+            'content' => "Select a staff member:\n\n0 - Go back\n00 - Main menu",
             'type' => 'multiple_choice',
             'metadata' => [
                 'step' => 'staff_selection',
@@ -70,7 +73,7 @@ class PromptSeeder extends Seeder
         // Date prompt
         $datePrompt = Prompt::create([
             'title' => 'Sale Date',
-            'content' => "Enter sale date (DD/MM/YYYY) or press 1 to use today's date:",
+            'content' => "Enter sale date (DD/MM/YYYY) or press 1 to use today's date:\n\n0 - Go back\n00 - Main menu",
             'type' => 'text',
             'metadata' => [
                 'step' => 'date_selection',
@@ -83,7 +86,7 @@ class PromptSeeder extends Seeder
         // Quantity prompt
         $quantityPrompt = Prompt::create([
             'title' => 'Quantity',
-            'content' => "Enter quantity:",
+            'content' => "Enter quantity:\n\n0 - Go back\n00 - Main menu",
             'type' => 'numeric',
             'metadata' => [
                 'step' => 'quantity',
@@ -96,7 +99,7 @@ class PromptSeeder extends Seeder
         // Unit price prompt
         $unitPricePrompt = Prompt::create([
             'title' => 'Unit Price',
-            'content' => "Enter unit price:",
+            'content' => "Enter unit price:\n\n0 - Go back\n00 - Main menu",
             'type' => 'numeric',
             'metadata' => [
                 'step' => 'unit_price',
@@ -109,7 +112,7 @@ class PromptSeeder extends Seeder
         // Green product prompt
         $greenPrompt = Prompt::create([
             'title' => 'Green Product',
-            'content' => "Is this a green product sale?\n1. Yes\n2. No",
+            'content' => "Is this a green product sale?\n1. Yes\n2. No\n\n0 - Go back\n00 - Main menu",
             'type' => 'yes_no',
             'metadata' => [
                 'step' => 'green_product',
@@ -123,7 +126,7 @@ class PromptSeeder extends Seeder
         // Credit sale prompt
         $creditPrompt = Prompt::create([
             'title' => 'Credit Sale',
-            'content' => "Is this a credit sale?\n1. Yes\n2. No",
+            'content' => "Is this a credit sale?\n1. Yes\n2. No\n\n0 - Go back\n00 - Main menu",
             'type' => 'yes_no',
             'metadata' => [
                 'step' => 'credit_sale',
@@ -137,7 +140,7 @@ class PromptSeeder extends Seeder
         // Deposit prompt (only shown for credit sales)
         $depositPrompt = Prompt::create([
             'title' => 'Deposit',
-            'content' => "Enter deposit amount:",
+            'content' => "Enter deposit amount:\n\n0 - Go back\n00 - Main menu",
             'type' => 'numeric',
             'metadata' => [
                 'step' => 'deposit',
@@ -150,15 +153,51 @@ class PromptSeeder extends Seeder
         // Confirmation prompt
         $confirmationPrompt = Prompt::create([
             'title' => 'Confirmation',
-            'content' => "Please confirm the sale details:\n\nReply:\n1. Confirm and submit\n2. Cancel",
+            'content' => "Please confirm the sale details.\n\n0 - Go back\n00 - Main menu",
             'type' => 'multiple_choice',
             'metadata' => [
                 'step' => 'confirmation',
                 'is_sales_flow' => true,
-                'options' => ['1' => 'Confirm', '2' => 'Cancel']
+                'options' => [
+                    '1' => 'Confirm',
+                    '2' => 'Cancel'
+                ]
             ],
             'active' => true,
             'order' => 11,
+        ]);
+
+        // Stock Check - Product Selection prompt
+        Prompt::create([
+            'title' => 'Stock Check Product Selection',
+            'content' => "Select a product to check stock:\n\n00 - Main menu",
+            'type' => 'multiple_choice',
+            'metadata' => [
+                'step' => 'stock_product_selection',
+                'is_sales_flow' => true,
+                'is_stock_check' => true,
+                'fetch_products' => true
+            ],
+            'active' => true,
+            'order' => 12,
+        ]);
+
+        // Stock Check - Green Product prompt
+        Prompt::create([
+            'title' => 'Stock Check Green Product',
+            'content' => "Is this a green product?\n1. Yes\n2. No\n\n0 - Go back\n00 - Main menu",
+            'type' => 'multiple_choice',
+            'metadata' => [
+                'step' => 'stock_green_product',
+                'is_sales_flow' => true,
+                'is_stock_check' => true,
+                'options' => [
+                    '1' => 'Yes',
+                    '2' => 'No'
+                ]
+            ],
+            'active' => true,
+            'order' => 13,
         ]);
 
         // New customer name prompt

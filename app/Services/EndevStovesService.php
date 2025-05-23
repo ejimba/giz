@@ -181,49 +181,44 @@ class EndevStovesService
     public function checkStockAvailability($productId, $isGreen = false)
     {
         try {
-            // Use POST instead of GET for stock checking as required by the API
-            $response = Http::withToken($this->getApiToken())
-                ->post($this->apiUrl . '/stock/check/', [
-                    'product_id' => $productId,
-                    'is_green' => $isGreen
-                ]);
-            
-            if ($response->successful()) {
-                $stockInfo = $response->json();
-                return [
-                    'available' => $stockInfo['available'] ?? false,
-                    'quantity' => $stockInfo['quantity'] ?? 0,
-                    'product_id' => $productId,
-                    'is_green' => $isGreen
-                ];
-            }
-            
-            // Fallback to checking all stock and filtering if the direct endpoint fails
+            // Get stock information from the correct endpoint
             $response = Http::withToken($this->getApiToken())
                 ->post($this->apiUrl . '/stock/');
-                
+            
             if ($response->successful()) {
-                $stocks = $response->json();
+                $allStock = $response->json();
                 
-                // Filter stocks based on product and green status
-                $filteredStocks = array_filter($stocks, function($stock) use ($productId, $isGreen) {
-                    if ($stock['product']['_id'] != $productId) {
-                        return false;
-                    }
-                    
-                    if ($isGreen && $stock['method'] !== 'Moulding') {
-                        return false;
-                    }
-                    
-                    if (!$isGreen && $stock['method'] === 'Moulding') {
-                        return false;
-                    }
-                    
-                    return $stock['countInStock'] > 0;
+                Log::info("Retrieved stock data", [
+                    'count' => count($allStock),
+                    'checking_product' => $productId
+                ]);
+                
+                // Filter stock items for the requested product
+                $filteredStocks = array_filter($allStock, function($item) use ($productId) {
+                    return isset($item['product']) && $item['product'] == $productId;
                 });
                 
-                // Check if any stock is available
+                // Further filter by green/non-green status (Moulding method = green)
+                $filteredStocks = array_filter($filteredStocks, function($item) use ($isGreen) {
+                    if ($isGreen) {
+                        return isset($item['method']) && $item['method'] === 'Moulding';
+                    } else {
+                        // Non-green products use methods other than Moulding (Firing, Cladding, etc.)
+                        return isset($item['method']) && $item['method'] !== 'Moulding';
+                    }
+                });
+                
+                // Reset array keys
+                $filteredStocks = array_values($filteredStocks);
+                
+                Log::info("Filtered stock for product", [
+                    'product_id' => $productId,
+                    'is_green' => $isGreen,
+                    'matching_items' => count($filteredStocks)
+                ]);
+                
                 if (empty($filteredStocks)) {
+                    // No stock found for this product with the specified criteria
                     return [
                         'available' => false,
                         'quantity' => 0,
@@ -232,26 +227,17 @@ class EndevStovesService
                     ];
                 }
                 
-                // Calculate total available quantity
+                // Calculate total quantity available (from countInStock field)
                 $totalQuantity = 0;
                 foreach ($filteredStocks as $stock) {
-                    $totalQuantity += $stock['countInStock'];
+                    $totalQuantity += isset($stock['countInStock']) ? (int)$stock['countInStock'] : 0;
                 }
                 
                 return [
-                    'available' => true,
+                    'available' => $totalQuantity > 0,
                     'quantity' => $totalQuantity,
                     'product_id' => $productId,
-                    'is_green' => $isGreen
-                ];
-                
-                $totalAvailable = array_reduce($filteredStocks, function($carry, $stock) {
-                    return $carry + $stock['countInStock'];
-                }, 0);
-                
-                return [
-                    'available' => count($filteredStocks) > 0,
-                    'quantity' => $totalAvailable,
+                    'is_green' => $isGreen,
                     'stocks' => $filteredStocks
                 ];
             }
@@ -263,14 +249,13 @@ class EndevStovesService
                 'is_green' => $isGreen
             ]);
             
-            // In case of error, provide a safe default response that allows the conversation to continue
-            // We'll assume there is stock available to prevent disrupting the conversation flow
-            // The actual stock check will happen at the point of sale
+            // In case of error, we need to be honest about not knowing the stock
             return [
-                'available' => true,
-                'quantity' => 999, // Large default value
+                'available' => false,
+                'quantity' => 0,
                 'product_id' => $productId,
                 'is_green' => $isGreen,
+                'error' => 'Unable to check stock at this time',
                 'is_fallback' => true // Flag to indicate this is a fallback response
             ];
         }

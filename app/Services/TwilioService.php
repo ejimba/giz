@@ -74,6 +74,25 @@ class TwilioService
             
             $to = 'whatsapp:' . $phoneNumber;
             $from = 'whatsapp:' . $this->fromNumber;
+            
+            // Check if To and From numbers are the same - Twilio doesn't allow this
+            if (str_replace('whatsapp:', '', $to) === str_replace('whatsapp:', '', $from)) {
+                Log::warning('Prevented sending WhatsApp message to same number as From number', [
+                    'to' => $to,
+                    'from' => $from,
+                    'message' => $messageContent
+                ]);
+                
+                // Mark as processed to prevent retries, but with special status
+                $outgoingMessage->processed_at = now();
+                $outgoingMessage->metadata = array_merge((array) $outgoingMessage->metadata, [
+                    'status' => 'skipped_same_number',
+                    'message' => 'Cannot send WhatsApp message from and to the same number'
+                ]);
+                $outgoingMessage->save();
+                
+                return $outgoingMessage;
+            }
 
             $response = $this->client->messages->create($to, [
                 'from' => $from,

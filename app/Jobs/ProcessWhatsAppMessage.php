@@ -63,9 +63,10 @@ class ProcessWhatsAppMessage implements ShouldQueue
             }
             
             // Check if this is a sales initiation message
-            if (trim(strtolower($incomingMessage->message)) === '1') {
-                // Start a new sales conversation
-                $salesConversationService->startSalesConversation($client);
+            $message = trim(strtolower($incomingMessage->message));
+            if ($message === '1' || $message === '2') {
+                // Start a new sales conversation and pass the initial message
+                $salesConversationService->startSalesConversation($client, $message);
                 return;
             }
             
