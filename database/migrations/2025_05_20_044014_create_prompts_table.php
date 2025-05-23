@@ -20,10 +20,12 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->boolean('active')->default(true);
             $table->integer('order')->default(0);
-            $table->string('type')->default('text'); // text, multiple_choice, yes_no, etc.
+            $table->string('type')->default('text');
             $table->timestamps();
             $table->softDeletes();
-            
+        });
+        
+        Schema::table('prompts', function (Blueprint $table) {
             $table->foreign('next_prompt_id')->references('id')->on('prompts')->nullOnDelete();
             $table->foreign('parent_prompt_id')->references('id')->on('prompts')->nullOnDelete();
         });
