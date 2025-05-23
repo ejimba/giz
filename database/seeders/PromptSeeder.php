@@ -122,6 +122,20 @@ class PromptSeeder extends Seeder
             'active' => true,
             'order' => 8,
         ]);
+        
+        // Add more products prompt
+        $addMoreProductsPrompt = Prompt::create([
+            'title' => 'Add More Products',
+            'content' => "Would you like to add another product?\n1. Yes\n2. No (proceed to checkout)\n\n0 - Go back\n00 - Main menu",
+            'type' => 'multiple_choice',
+            'metadata' => [
+                'step' => 'add_more_products',
+                'is_sales_flow' => true,
+                'options' => ['1' => 'Yes', '2' => 'No']
+            ],
+            'active' => true,
+            'order' => 9,
+        ]);
 
         // Credit sale prompt
         $creditPrompt = Prompt::create([

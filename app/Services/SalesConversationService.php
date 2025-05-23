@@ -15,15 +15,24 @@ class SalesConversationService
     
     // Navigation history to track previous steps
     protected $navigationSteps = [
-        'product_selection' => 'initial',
-        'product_green' => 'product_selection',
-        'customer_selection' => 'product_green',
-        'quantity' => 'customer_selection',
-        'confirm_sale' => 'quantity',
+        'staff_selection' => 'initial',
+        'customer_selection' => 'staff_selection',
+        'date_selection' => 'customer_selection',
+        'product_selection' => 'date_selection',
+        'quantity' => 'product_selection',
+        'unit_price' => 'quantity',
+        'green_product' => 'unit_price',
+        'add_more_products' => 'green_product',
+        'credit_sale' => 'add_more_products',
+        'deposit' => 'credit_sale',
+        'confirmation' => 'deposit',
         'stock_product_selection' => 'initial',
         'stock_green_product' => 'stock_product_selection',
         'stock_check_result' => 'stock_green_product'
     ];
+    
+    // Property to store the cart items
+    protected $cartItems = [];
 
     public function __construct(TwilioService $twilioService, EndevStovesService $endevStovesService)
     {
@@ -172,6 +181,8 @@ class SalesConversationService
                     return $this->processUnitPrice($conversation, $messageBody);
                 case 'green_product':
                     return $this->processGreenProduct($conversation, $messageBody);
+                case 'add_more_products':
+                    return $this->processAddMoreProducts($conversation, $messageBody);
                 case 'credit_sale':
                     return $this->processCreditSale($conversation, $messageBody);
                 case 'deposit':
@@ -220,8 +231,8 @@ class SalesConversationService
         $option = trim($message);
         
         if ($option === "1") {
-            // User selected "Record a Sale"
-            return $this->fetchAndDisplayProducts($conversation);
+            // User selected "Record a Sale" - start with staff selection
+            return $this->fetchAndDisplayStaff($conversation);
         } else if ($option === "2") {
             // User selected "Check Stock Availability"
             return $this->fetchProductsForStockCheck($conversation);
@@ -368,53 +379,33 @@ class SalesConversationService
             return false;
         }
 
-        // Store selected product
+        // Store selected product temporarily
         $metadata['selected_product'] = $products[$selection];
-        $metadata['step'] = 'customer_selection';
         $conversation->metadata = $metadata;
         $conversation->save();
 
-        // Fetch customers
-        try {
-            $customers = $this->endevStovesService->fetchCustomers();
+        // Ask for green product status first before checking stock
+        $metadata['step'] = 'green_product';
+        $conversation->metadata = $metadata;
+        $conversation->save();
+        
+        // Update prompt
+        $nextPrompt = Prompt::where('active', true)
+            ->where('title', 'Green Product')
+            ->first();
 
-            // Format customer list
-            $customerList = "Select a customer:\n";
-            foreach ($customers as $index => $customer) {
-                $customerList .= ($index + 1) . ". " . $customer['name'] . "\n";
-            }
-            $customerList .= (count($customers) + 1) . ". Create New Customer";
-
-            // Store customers in metadata
-            $metadata['customers'] = $customers;
-            $conversation->metadata = $metadata;
+        if ($nextPrompt) {
+            $conversation->current_prompt_id = $nextPrompt->id;
             $conversation->save();
-
-            // Update prompt
-            $nextPrompt = Prompt::where('active', true)
-                ->where('title', 'Customer Selection')
-                ->first();
-
-            if ($nextPrompt) {
-                $conversation->current_prompt_id = $nextPrompt->id;
-                $conversation->save();
-            }
-
-            // Send customer list
-            $this->twilioService->sendWhatsAppMessage(
-                $conversation->client->phone,
-                $customerList
-            );
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error("Error fetching customers: " . $e->getMessage());
-            $this->twilioService->sendWhatsAppMessage(
-                $conversation->client->phone,
-                "Sorry, we couldn't retrieve the customer list. Please try again."
-            );
-            return false;
         }
+
+        // Ask about green product
+        $this->twilioService->sendWhatsAppMessage(
+            $conversation->client->phone,
+            "Is this a green product sale?\n1. Yes\n2. No"
+        );
+
+        return true;
     }
     /**
      * Process customer selection
@@ -441,12 +432,28 @@ class SalesConversationService
 
         // Store selected customer
         $metadata['selected_customer'] = $customers[$selection];
-        $metadata['step'] = 'staff_selection';
+        $metadata['step'] = 'date_selection';
         $conversation->metadata = $metadata;
         $conversation->save();
 
-        // Proceed to staff selection
-        return $this->fetchAndDisplayStaff($conversation);
+        // Update prompt
+        $nextPrompt = \App\Models\Prompt::where('active', true)
+            ->where('title', 'Sale Date')
+            ->first();
+
+        if ($nextPrompt) {
+            $conversation->current_prompt_id = $nextPrompt->id;
+            $conversation->save();
+        }
+
+        // Prompt for date
+        $today = date('d/m/Y');
+        $this->twilioService->sendWhatsAppMessage(
+            $conversation->client->phone,
+            "Enter sale date (DD/MM/YYYY) or press 1 to use today's date ($today):"
+        );
+
+        return true;
     }
 
     private function startNewCustomerFlow($conversation)
@@ -550,10 +557,10 @@ class SalesConversationService
 
             $customer = $this->endevStovesService->createCustomer($customerData);
 
-            // Store new customer and proceed to staff selection
+            // Store new customer and proceed to date selection
             $metadata = $conversation->metadata;
             $metadata['selected_customer'] = $customer;
-            $metadata['step'] = 'staff_selection';
+            $metadata['step'] = 'date_selection';
             $metadata['creating_customer'] = false;
             $conversation->metadata = $metadata;
             $conversation->save();
@@ -563,8 +570,24 @@ class SalesConversationService
                 "Customer created successfully. Proceeding with sale."
             );
 
-            // Proceed to staff selection
-            return $this->fetchAndDisplayStaff($conversation);
+            // Update prompt for date selection
+            $nextPrompt = \App\Models\Prompt::where('active', true)
+                ->where('title', 'Sale Date')
+                ->first();
+
+            if ($nextPrompt) {
+                $conversation->current_prompt_id = $nextPrompt->id;
+                $conversation->save();
+            }
+
+            // Prompt for date
+            $today = date('d/m/Y');
+            $this->twilioService->sendWhatsAppMessage(
+                $conversation->client->phone,
+                "Enter sale date (DD/MM/YYYY) or press 1 to use today's date ($today):\n\n0 - Go back\n00 - Main menu"
+            );
+
+            return true;
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Customer creation failed: " . $e->getMessage());
 
@@ -665,10 +688,12 @@ class SalesConversationService
             foreach ($staff as $index => $member) {
                 $staffList .= ($index + 1) . ". " . $member['name'] . "\n";
             }
+            $staffList .= "\n00 - Main menu";
 
-            // Store staff in metadata
+            // Store staff in metadata and explicitly set the step
             $metadata = $conversation->metadata;
             $metadata['staff'] = $staff;
+            $metadata['step'] = 'staff_selection';
             $conversation->metadata = $metadata;
             $conversation->save();
 
@@ -716,28 +741,51 @@ class SalesConversationService
 
         // Store selected staff
         $metadata['selected_staff'] = $staff[$selection];
-        $metadata['step'] = 'date_selection';
+        $metadata['step'] = 'customer_selection';
         $conversation->metadata = $metadata;
         $conversation->save();
 
-        // Update prompt
-        $nextPrompt = \App\Models\Prompt::where('active', true)
-            ->where('title', 'Sale Date')
-            ->first();
+        // Fetch customers
+        try {
+            $customers = $this->endevStovesService->fetchCustomers();
 
-        if ($nextPrompt) {
-            $conversation->current_prompt_id = $nextPrompt->id;
+            // Format customer list
+            $customerList = "Select a customer:\n";
+            foreach ($customers as $index => $customer) {
+                $customerList .= ($index + 1) . ". " . $customer['name'] . "\n";
+            }
+            $customerList .= (count($customers) + 1) . ". Create New Customer";
+
+            // Store customers in metadata
+            $metadata['customers'] = $customers;
+            $conversation->metadata = $metadata;
             $conversation->save();
+
+            // Update prompt
+            $nextPrompt = Prompt::where('active', true)
+                ->where('title', 'Customer Selection')
+                ->first();
+
+            if ($nextPrompt) {
+                $conversation->current_prompt_id = $nextPrompt->id;
+                $conversation->save();
+            }
+
+            // Send customer list
+            $this->twilioService->sendWhatsAppMessage(
+                $conversation->client->phone,
+                $customerList
+            );
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error("Error fetching customers: " . $e->getMessage());
+            $this->twilioService->sendWhatsAppMessage(
+                $conversation->client->phone,
+                "Sorry, we couldn't retrieve the customer list. Please try again."
+            );
+            return false;
         }
-
-        // Prompt for date
-        $today = date('d/m/Y');
-        $this->twilioService->sendWhatsAppMessage(
-            $conversation->client->phone,
-            "Enter sale date (DD/MM/YYYY) or press 1 to use today's date ($today):"
-        );
-
-        return true;
     }
 
     /**
@@ -774,27 +822,14 @@ class SalesConversationService
         // Store date
         $metadata = $conversation->metadata;
         $metadata['sale_date'] = $date;
-        $metadata['step'] = 'quantity';
+        // Initialize empty cart for products
+        $metadata['cart'] = [];
+        $metadata['step'] = 'product_selection';
         $conversation->metadata = $metadata;
         $conversation->save();
 
-        // Update prompt
-        $nextPrompt = \App\Models\Prompt::where('active', true)
-            ->where('title', 'Quantity')
-            ->first();
-
-        if ($nextPrompt) {
-            $conversation->current_prompt_id = $nextPrompt->id;
-            $conversation->save();
-        }
-
-        // Prompt for quantity
-        $this->twilioService->sendWhatsAppMessage(
-            $conversation->client->phone,
-            "Enter quantity:"
-        );
-
-        return true;
+        // Proceed to product selection
+        return $this->fetchAndDisplayProducts($conversation);
     }
 
     /**
@@ -812,13 +847,20 @@ class SalesConversationService
             return false;
         }
 
-        // Check stock availability
+        // Validate against available stock
         try {
             $metadata = $conversation->metadata;
-            $productId = $metadata['selected_product']['_id'];
-
-            // We'll check stock later when green product status is known
-            // Just store the quantity for now
+            $availableStock = $metadata['available_stock'] ?? 0;
+            
+            if ($quantity > $availableStock) {
+                $this->twilioService->sendWhatsAppMessage(
+                    $conversation->client->phone,
+                    "Sorry, only {$availableStock} units are available. Please enter a smaller quantity."
+                );
+                return false;
+            }
+            
+            // Store the quantity
             $metadata['quantity'] = $quantity;
             $metadata['step'] = 'unit_price';
             $conversation->metadata = $metadata;
@@ -875,28 +917,65 @@ class SalesConversationService
             }
         }
 
-        // Store unit price and calculate total
+        // Store unit price and calculate total for this item
         $metadata = $conversation->metadata;
         $metadata['unit_price'] = $unitPrice;
-        $metadata['total_price'] = $unitPrice * $metadata['quantity'];
-        $metadata['step'] = 'green_product';
+        $itemTotal = $unitPrice * $metadata['quantity'];
+        
+        // Add the current product to the cart
+        $cart = $metadata['cart'] ?? [];
+        $cart[] = [
+            'product' => $metadata['selected_product'],
+            'quantity' => $metadata['quantity'],
+            'unit_price' => $unitPrice,
+            'is_green' => $metadata['green'] ?? false,
+            'total' => $itemTotal
+        ];
+        
+        $metadata['cart'] = $cart;
+        $metadata['step'] = 'add_more_products';
+        $conversation->metadata = $metadata;
+        $conversation->save();
+        
+        // Calculate order total across all items
+        $orderTotal = 0;
+        foreach ($cart as $item) {
+            $orderTotal += $item['total'];
+        }
+        $metadata['order_total'] = $orderTotal;
         $conversation->metadata = $metadata;
         $conversation->save();
 
-        // Update prompt
+        // Update prompt for adding more products
         $nextPrompt = \App\Models\Prompt::where('active', true)
-            ->where('title', 'Green Product')
+            ->where('title', 'Add More Products')
             ->first();
+
+        if (!$nextPrompt) {
+            // If the prompt doesn't exist, use the Credit Sale prompt as fallback
+            $nextPrompt = \App\Models\Prompt::where('active', true)
+                ->where('title', 'Credit Sale')
+                ->first();
+        }
 
         if ($nextPrompt) {
             $conversation->current_prompt_id = $nextPrompt->id;
             $conversation->save();
         }
 
-        // Ask about green product
+        // Format cart summary
+        $cartSummary = "Current cart:\n";
+        foreach ($cart as $index => $item) {
+            $productName = $item['product']['name'] . ' ' . $item['product']['type'];
+            $isGreen = $item['is_green'] ? ' (Green)' : '';
+            $cartSummary .= ($index + 1) . ". {$productName}{$isGreen} - {$item['quantity']} units x {$item['unit_price']} = {$item['total']}\n";
+        }
+        $cartSummary .= "\nTotal: {$orderTotal}\n\n";
+        
+        // Ask if the user wants to add more products
         $this->twilioService->sendWhatsAppMessage(
             $conversation->client->phone,
-            "Is this a green product sale?\n1. Yes\n2. No"
+            $cartSummary . "Would you like to add another product?\n1. Yes\n2. No (proceed to checkout)"
         );
 
         return true;
@@ -923,8 +1002,12 @@ class SalesConversationService
         try {
             $metadata = $conversation->metadata;
             $productId = $metadata['selected_product']['_id'];
-            $quantity = $metadata['quantity'];
-
+            
+            // Store green product selection
+            $metadata['green'] = $isGreen;
+            $conversation->metadata = $metadata;
+            $conversation->save();
+            
             $stockInfo = $this->endevStovesService->checkStockAvailability($productId, $isGreen);
 
             if (!$stockInfo['available']) {
@@ -933,60 +1016,32 @@ class SalesConversationService
                     "Sorry, there is no stock available for this product. Please try another product."
                 );
 
-                // Go back to product selection
+                // Go back to product selection while preserving other sale information
                 return $this->fetchAndDisplayProducts($conversation);
             }
-
-            if ($stockInfo['quantity'] < $quantity) {
-                $this->twilioService->sendWhatsAppMessage(
-                    $conversation->client->phone,
-                    "Sorry, only {$stockInfo['quantity']} units are available. Please enter a smaller quantity."
-                );
-
-                // Go back to quantity prompt
-                $metadata['step'] = 'quantity';
-                $conversation->metadata = $metadata;
-                $conversation->save();
-
-                $quantityPrompt = \App\Models\Prompt::where('active', true)
-                    ->where('title', 'Quantity')
-                    ->first();
-
-                if ($quantityPrompt) {
-                    $conversation->current_prompt_id = $quantityPrompt->id;
-                    $conversation->save();
-                }
-
-                $this->twilioService->sendWhatsAppMessage(
-                    $conversation->client->phone,
-                    "Enter quantity (max {$stockInfo['quantity']}):"
-                );
-
-                return false;
-            }
-
-            // Store green product selection
-            $metadata['green'] = $isGreen;
-            $metadata['step'] = 'credit_sale';
+            
+            // Store available stock quantity for this product
+            $metadata['available_stock'] = $stockInfo['quantity'];
+            $metadata['step'] = 'quantity';
             $conversation->metadata = $metadata;
             $conversation->save();
-
+            
             // Update prompt
             $nextPrompt = \App\Models\Prompt::where('active', true)
-                ->where('title', 'Credit Sale')
+                ->where('title', 'Quantity')
                 ->first();
 
             if ($nextPrompt) {
                 $conversation->current_prompt_id = $nextPrompt->id;
                 $conversation->save();
             }
-
-            // Ask about credit sale
+            
+            // Ask for quantity now that we know what's available
             $this->twilioService->sendWhatsAppMessage(
                 $conversation->client->phone,
-                "Is this a credit sale?\n1. Yes\n2. No"
+                "Available stock: {$stockInfo['quantity']} units\nEnter quantity:"
             );
-
+            
             return true;
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Error checking stock: " . $e->getMessage());
@@ -998,6 +1053,66 @@ class SalesConversationService
         }
     }
 
+    /**
+     * Process add more products selection
+     */
+    private function processAddMoreProducts($conversation, $message)
+    {
+        $selection = trim($message);
+        
+        if ($selection !== "1" && $selection !== "2") {
+            $this->twilioService->sendWhatsAppMessage(
+                $conversation->client->phone,
+                "Invalid selection. Please reply with 1 to add another product or 2 to proceed to checkout."
+            );
+            return false;
+        }
+        
+        if ($selection === "1") {
+            // User wants to add more products - go back to product selection
+            $metadata = $conversation->metadata;
+            $metadata['step'] = 'product_selection';
+            $conversation->metadata = $metadata;
+            $conversation->save();
+            
+            // Clear temporary product selection data but preserve the cart
+            unset($metadata['selected_product']);
+            unset($metadata['quantity']);
+            unset($metadata['unit_price']);
+            unset($metadata['green']);
+            unset($metadata['available_stock']);
+            $conversation->metadata = $metadata;
+            $conversation->save();
+            
+            // Return to product selection
+            return $this->fetchAndDisplayProducts($conversation);
+        } else {
+            // User wants to proceed to checkout
+            $metadata = $conversation->metadata;
+            $metadata['step'] = 'credit_sale';
+            $conversation->metadata = $metadata;
+            $conversation->save();
+            
+            // Update prompt
+            $nextPrompt = \App\Models\Prompt::where('active', true)
+                ->where('title', 'Credit Sale')
+                ->first();
+                
+            if ($nextPrompt) {
+                $conversation->current_prompt_id = $nextPrompt->id;
+                $conversation->save();
+            }
+            
+            // Ask about credit sale
+            $this->twilioService->sendWhatsAppMessage(
+                $conversation->client->phone,
+                "Is this a credit sale?\n1. Yes\n2. No"
+            );
+            
+            return true;
+        }
+    }
+    
     /**
      * Process credit sale selection
      */
@@ -1177,45 +1292,100 @@ class SalesConversationService
      */
     private function submitSaleToAPI($conversation)
     {
-        $metadata = $conversation->metadata;
-
-        // Prepare sale data
-        $saleData = [
-            'product' => $metadata['selected_product']['_id'],
-            'customer' => $metadata['selected_customer']['_id'],
-            'staffID' => $metadata['selected_staff']['_id'],
-            'date' => $metadata['sale_date'],
-            'quantity' => $metadata['quantity'],
-            'unitPrice' => $metadata['unit_price'],
-            'totalPrice' => $metadata['total_price'],
-            'green' => $metadata['green'],
-            'onCredit' => $metadata['on_credit'],
-            'deposit' => $metadata['deposit'],
-        ];
-
         try {
-            // Submit to API
-            $sale = $this->endevStovesService->createSale($saleData);
-
-            // Send confirmation
+            $metadata = $conversation->metadata;
+            $cart = $metadata['cart'] ?? [];
+            
+            if (empty($cart)) {
+                throw new \Exception('Cart is empty. No products to submit.');
+            }
+            
+            $results = [];
+            $allSuccess = true;
+            
+            // Process each cart item as a separate sale
+            foreach ($cart as $index => $item) {
+                $saleData = [
+                    'product' => $item['product']['_id'],
+                    'customer' => $metadata['selected_customer']['_id'],
+                    'staffID' => $metadata['selected_staff']['_id'],
+                    'date' => $metadata['sale_date'],
+                    'quantity' => $item['quantity'],
+                    'unitPrice' => $item['unit_price'],
+                    'totalPrice' => $item['total'],
+                    'green' => $item['is_green'] ? true : false,
+                    'onCredit' => $metadata['is_credit'] ? true : false,
+                ];
+                
+                // Add deposit if it's a credit sale (divide deposit proportionally among items)
+                if ($metadata['is_credit'] && isset($metadata['deposit'])) {
+                    // Calculate this item's share of the deposit based on its percentage of the total order
+                    $orderTotal = $metadata['order_total'] ?? 1; // Prevent division by zero
+                    $itemPercentage = $item['total'] / $orderTotal;
+                    $itemDeposit = round($metadata['deposit'] * $itemPercentage, 2);
+                    $saleData['deposit'] = $itemDeposit;
+                } else if ($metadata['is_credit']) {
+                    $saleData['deposit'] = 0;
+                }
+                
+                // Submit this item to the API
+                try {
+                    $result = $this->endevStovesService->createSale($saleData);
+                    $results[] = [
+                        'product' => $item['product']['name'] . ' ' . $item['product']['type'],
+                        'quantity' => $item['quantity'],
+                        'success' => true,
+                        'result' => $result
+                    ];
+                } catch (\Exception $e) {
+                    $allSuccess = false;
+                    $results[] = [
+                        'product' => $item['product']['name'] . ' ' . $item['product']['type'],
+                        'quantity' => $item['quantity'],
+                        'success' => false,
+                        'error' => $e->getMessage()
+                    ];
+                    Log::error("Error submitting sale item: " . $e->getMessage(), [
+                        'product' => $item['product']['name'],
+                        'sale_data' => $saleData
+                    ]);
+                }
+            }
+            
+            // Store results in metadata
+            $metadata['sale_results'] = $results;
+            $conversation->metadata = $metadata;
+            $conversation->save();
+            
+            // Generate confirmation message
+            $confirmationMessage = "Sale recorded " . ($allSuccess ? "successfully!" : "with some errors.") . "\n\n";
+            
+            foreach ($results as $result) {
+                $confirmationMessage .= $result['product'] . ": " . 
+                    ($result['success'] ? "Success" : "Failed - " . $result['error']) . "\n";
+            }
+            
+            $confirmationMessage .= "\nThank you. Send '1' to record another sale.";
+            
+            // Send confirmation to user
             $this->twilioService->sendWhatsAppMessage(
                 $conversation->client->phone,
-                "Sale recorded successfully!\nReceipt #: " . ($sale['receiptNumber'] ?? 'Generated') .
-                    "\nThank you. Send '1' to record another sale."
+                $confirmationMessage
             );
-
+            
             $conversation->status = 'completed';
             $conversation->completed_at = now();
             $conversation->save();
-
-            return true;
+            
+            return $allSuccess;
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Sale submission failed: " . $e->getMessage());
-
+            Log::error("Error submitting sale: " . $e->getMessage());
+            
             $this->twilioService->sendWhatsAppMessage(
                 $conversation->client->phone,
-                "Invalid option. Please send 1 to check another product or 2 to go back to main menu."
+                "Error submitting sale: " . $e->getMessage() . "\nPlease try again."
             );
+            
             return false;
         }
     }
@@ -1433,82 +1603,102 @@ class SalesConversationService
             'conversation_id' => $conversation->id
         ]);
         
-        // Find the appropriate prompt for the previous step
-        $previousPrompt = null;
-        
-        if ($previousStep === 'initial') {
-            // If going back to main menu
-            $previousPrompt = Prompt::where('active', true)
-                ->where('title', 'Sales Menu')
-                ->whereJsonContains('metadata->is_sales_flow', true)
-                ->first();
-        } else if ($previousStep === 'product_selection') {
-            $previousPrompt = Prompt::where('active', true)
-                ->where('title', 'Sales Product Selection')
-                ->first();
-        } else if ($previousStep === 'product_green') {
-            $previousPrompt = Prompt::where('active', true)
-                ->where('title', 'Sales Green Product')
-                ->first();
-            
-            // We need to preserve the selected product
-            if (isset($metadata['selected_product_id'])) {
-                $metadata['step'] = $previousStep;
-                $conversation->metadata = $metadata;
-            }
-        } else if ($previousStep === 'customer_selection') {
-            $previousPrompt = Prompt::where('active', true)
-                ->where('title', 'Sales Customer Selection')
-                ->first();
-            
-            // Preserve selected product and green status
-            if (isset($metadata['selected_product_id'])) {
-                $metadata['step'] = $previousStep;
-                $conversation->metadata = $metadata;
-            }
-        } else if ($previousStep === 'quantity') {
-            $previousPrompt = Prompt::where('active', true)
-                ->where('title', 'Sales Quantity')
-                ->first();
-            
-            // Preserve product, green status, and customer
-            $metadata['step'] = $previousStep;
-            $conversation->metadata = $metadata;
-        } else if ($previousStep === 'stock_product_selection') {
-            $previousPrompt = Prompt::where('active', true)
-                ->where('title', 'Stock Check Product Selection')
-                ->first();
-        } else if ($previousStep === 'stock_green_product') {
-            $previousPrompt = Prompt::where('active', true)
-                ->where('title', 'Stock Check Green Product')
-                ->first();
-            
-            // Preserve selected product
-            if (isset($metadata['selected_product_id'])) {
-                $metadata['step'] = $previousStep;
-                $conversation->metadata = $metadata;
-            }
-        }
-        
-        if (!$previousPrompt) {
-            Log::error('Previous step prompt not found', [
-                'step' => $previousStep,
-                'conversation_id' => $conversation->id
-            ]);
-            return;
-        }
-        
-        // Update conversation with previous prompt
+        // Update the step in metadata
         $metadata['step'] = $previousStep;
-        $conversation->update([
-            'current_prompt_id' => $previousPrompt->id,
-            'metadata' => $metadata
-        ]);
+        $conversation->metadata = $metadata;
+        $conversation->save();
         
-        // Send the previous prompt to the client
-        $this->twilioService->sendWhatsAppMessage(
-            $conversation->client->phone,
-            $previousPrompt->content
-        );
+        // Handle the navigation based on the previous step
+        if ($previousStep === 'initial') {
+            // Going back to main menu
+            $this->resetToMainMenu($conversation);
+        } else if ($previousStep === 'staff_selection') {
+            // Going back to staff selection
+            $this->fetchAndDisplayStaff($conversation);
+        } else if ($previousStep === 'customer_selection') {
+            // Display customer list
+            try {
+                $customers = $this->endevStovesService->fetchCustomers();
+                
+                // Format customer list
+                $customerList = "Select a customer:\n";
+                foreach ($customers as $index => $customer) {
+                    $customerList .= ($index + 1) . ". " . $customer['name'] . "\n";
+                }
+                $customerList .= (count($customers) + 1) . ". Create New Customer\n\n";
+                $customerList .= "0 - Go back\n00 - Main menu";
+                
+                // Store customers in metadata
+                $metadata['customers'] = $customers;
+                $conversation->metadata = $metadata;
+                $conversation->save();
+                
+                // Update prompt
+                $nextPrompt = Prompt::where('active', true)
+                    ->where('title', 'Customer Selection')
+                    ->first();
+                    
+                if ($nextPrompt) {
+                    $conversation->current_prompt_id = $nextPrompt->id;
+                    $conversation->save();
+                }
+                
+                // Send customer list
+                $this->twilioService->sendWhatsAppMessage(
+                    $conversation->client->phone,
+                    $customerList
+                );
+            } catch (\Exception $e) {
+                Log::error("Error fetching customers: " . $e->getMessage());
+                $this->twilioService->sendWhatsAppMessage(
+                    $conversation->client->phone,
+                    "Sorry, we couldn't retrieve the customer list. Please try again."
+                );
+            }
+        } else if ($previousStep === 'date_selection') {
+            // Prompt for date
+            $today = date('d/m/Y');
+            
+            // Update prompt
+            $nextPrompt = Prompt::where('active', true)
+                ->where('title', 'Sale Date')
+                ->first();
+
+            if ($nextPrompt) {
+                $conversation->current_prompt_id = $nextPrompt->id;
+                $conversation->save();
+            }
+            
+            $this->twilioService->sendWhatsAppMessage(
+                $conversation->client->phone,
+                "Enter sale date (DD/MM/YYYY) or press 1 to use today's date ($today):\n\n0 - Go back\n00 - Main menu"
+            );
+        } else if ($previousStep === 'product_selection') {
+            // Going back to product selection
+            $this->fetchAndDisplayProducts($conversation);
+        } else {
+            // For other steps, try to find the prompt by title
+            $stepWords = explode('_', $previousStep);
+            $stepWords = array_map('ucfirst', $stepWords);
+            $promptTitle = implode(' ', $stepWords);
+            
+            $previousPrompt = Prompt::where('active', true)
+                ->where('title', $promptTitle)
+                ->first();
+                
+            if ($previousPrompt) {
+                $conversation->current_prompt_id = $previousPrompt->id;
+                $conversation->save();
+                
+                // Send the prompt content
+                $this->twilioService->sendWhatsAppMessage(
+                    $conversation->client->phone,
+                    $previousPrompt->content
+                );
+            } else {
+                // If we can't find a prompt, just go back to main menu
+                $this->resetToMainMenu($conversation);
+            }
+        }
     }
 }
