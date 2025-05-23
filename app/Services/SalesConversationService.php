@@ -1196,12 +1196,12 @@ class SalesConversationService
 
         // Check if deposit is greater than total price
         $metadata = $conversation->metadata;
-        $totalPrice = $metadata['total_price'];
+        $orderTotal = $metadata['order_total'] ?? 0;
 
-        if ($deposit > $totalPrice) {
+        if ($deposit > $orderTotal) {
             $this->twilioService->sendWhatsAppMessage(
                 $conversation->client->phone,
-                "Deposit cannot be greater than the total price ($totalPrice). Please enter a smaller amount."
+                "Deposit cannot be greater than the total price ($orderTotal). Please enter a smaller amount."
             );
             return false;
         }
@@ -1231,20 +1231,27 @@ class SalesConversationService
     private function sendSaleConfirmation($conversation)
     {
         $metadata = $conversation->metadata;
+        $cart = $metadata['cart'] ?? [];
+        $orderTotal = $metadata['order_total'] ?? 0;
 
         // Format confirmation message
         $confirmation = "Please confirm the sale details:\n\n";
-        $confirmation .= "Product: " . $metadata['selected_product']['name'] . " " . $metadata['selected_product']['type'] . "\n";
         $confirmation .= "Customer: " . $metadata['selected_customer']['name'] . "\n";
         $confirmation .= "Staff: " . $metadata['selected_staff']['name'] . "\n";
-        $confirmation .= "Date: " . date('d/m/Y', strtotime($metadata['sale_date'])) . "\n";
-        $confirmation .= "Quantity: " . $metadata['quantity'] . "\n";
-        $confirmation .= "Unit Price: " . $metadata['unit_price'] . "\n";
-        $confirmation .= "Total Price: " . $metadata['total_price'] . "\n";
-        $confirmation .= "Green Product: " . ($metadata['green'] ? "Yes" : "No") . "\n";
-        $confirmation .= "Credit Sale: " . ($metadata['on_credit'] ? "Yes" : "No") . "\n";
+        $confirmation .= "Date: " . date('d/m/Y', strtotime($metadata['sale_date'])) . "\n\n";
+        
+        // List all products in the cart
+        $confirmation .= "Products:\n";
+        foreach ($cart as $index => $item) {
+            $productName = $item['product']['name'] . ' ' . $item['product']['type'];
+            $isGreen = $item['is_green'] ? ' (Green)' : '';
+            $confirmation .= ($index + 1) . ". {$productName}{$isGreen} - {$item['quantity']} units x {$item['unit_price']} = {$item['total']}\n";
+        }
+        
+        $confirmation .= "\nTotal Amount: " . $orderTotal . "\n";
+        $confirmation .= "Credit Sale: " . (isset($metadata['is_credit']) && $metadata['is_credit'] ? "Yes" : "No") . "\n";
 
-        if ($metadata['on_credit']) {
+        if (isset($metadata['is_credit']) && $metadata['is_credit'] && isset($metadata['deposit'])) {
             $confirmation .= "Deposit: " . $metadata['deposit'] . "\n";
         }
 
@@ -1314,17 +1321,18 @@ class SalesConversationService
                     'unitPrice' => $item['unit_price'],
                     'totalPrice' => $item['total'],
                     'green' => $item['is_green'] ? true : false,
-                    'onCredit' => $metadata['is_credit'] ? true : false,
+                    'onCredit' => isset($metadata['is_credit']) && $metadata['is_credit'] ? true : false,
+                    'deposit' => isset($metadata['deposit']) ? $metadata['deposit'] : 0,
                 ];
                 
                 // Add deposit if it's a credit sale (divide deposit proportionally among items)
-                if ($metadata['is_credit'] && isset($metadata['deposit'])) {
+                if (isset($metadata['is_credit']) && $metadata['is_credit'] && isset($metadata['deposit'])) {
                     // Calculate this item's share of the deposit based on its percentage of the total order
                     $orderTotal = $metadata['order_total'] ?? 1; // Prevent division by zero
                     $itemPercentage = $item['total'] / $orderTotal;
                     $itemDeposit = round($metadata['deposit'] * $itemPercentage, 2);
                     $saleData['deposit'] = $itemDeposit;
-                } else if ($metadata['is_credit']) {
+                } else if (isset($metadata['is_credit']) && $metadata['is_credit']) {
                     $saleData['deposit'] = 0;
                 }
                 
