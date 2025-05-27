@@ -63,7 +63,7 @@ class NewCustomerPhoneHandler extends BaseStepHandler implements StepHandlerInte
             $conv->update(['metadata' => $meta]);
             $this->twilio->sendWhatsAppMessage(
                 $conv->client->phone,
-                $this->withNav("Customer created successfully.")
+                "Customer created successfully."
             );
             $this->transitionTo($conv, $meta['step'], $meta);
             return;
