@@ -12,8 +12,6 @@ class ProcessOutgoingMessages extends Command
 
     public function handle()
     {
-        $this->info('Processing outgoing messages...');
         dispatch_sync(new \App\Jobs\ProcessOutgoingMessages());
-        $this->info('Outgoing messages processed successfully!');
     }
 }

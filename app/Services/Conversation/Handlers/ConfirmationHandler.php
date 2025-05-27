@@ -113,10 +113,10 @@ class ConfirmationHandler extends BaseStepHandler implements StepHandlerInterfac
                 }
             }
             $header = $allGood ? "Sale recorded successfully!\n\n" : "Sale recorded with some errors.\n\n";
-            $footer = "\nThank you.\n";
+            $footer = "\n\nThank you.\n";
             $this->twilio->sendWhatsAppMessage(
                 $conv->client->phone,
-                $this->withNav($header . implode("\n", $lines) . $footer)
+                $header . implode("\n", $lines) . $footer
             );
             $this->endConversation($conv, 'completed');
             $this->startConversation($conv->client);

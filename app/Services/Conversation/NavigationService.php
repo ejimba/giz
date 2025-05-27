@@ -17,10 +17,6 @@ class NavigationService
 
     public function resetToMain(Conversation $conv): void
     {
-        info('Resetting conversation to main menu', [
-            'conv_id' => $conv->id,
-            'current_step' => $conv->metadata['step'] ?? Step::INITIAL,
-        ]);
         $prompt = Prompt::where('active', true)
             ->where('title', 'Sales Menu')
             ->whereJsonContains('metadata->is_sales_flow', true)

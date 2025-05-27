@@ -30,21 +30,11 @@ class ConversationService
             $body = trim($incoming->message);
             $this->storeInbound($conv, $body);
             if ($this->handleNavigationCommands($conv, $body)) {
-                info('Handled navigation command', [
-                    'conv_id' => $conv->id,
-                    'step' => $conv->metadata['step'] ?? Step::INITIAL,
-                    'body' => $body,
-                ]);
                 return;
             }
             $step = $conv->metadata['step'] ?? Step::INITIAL;
             $handler = $this->stepHandlers[$step] ?? null;
             if (!$handler) {
-                info('No handler found for step', [
-                    'step' => $step,
-                    'available_handlers' => array_keys($this->stepHandlers),
-                    'conv_id' => $conv->id,
-                ]);
                 $this->nav->resetToMain($conv);
                 return;
             }
@@ -204,10 +194,6 @@ class ConversationService
     public function startConversation(Client $client): Conversation
     {
         $conversation = $this->getOrCreateConversation($client);
-        info('New conversation started', [
-            'client_id' => $client->id,
-            'conversation_id' => $conversation->id,
-        ]);
         return $conversation;
     }
 
