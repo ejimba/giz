@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Client;
 use App\Models\Prompt;
-use App\Services\ConversationService;
+use App\Services\Conversation\ConversationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 

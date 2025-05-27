@@ -31,7 +31,7 @@ class TestTwilioWhatsApp extends Command
 
             // Send the message
             $twilioService = app(TwilioService::class);
-            $result = $twilioService->sendWhatsAppMessage($outgoingMessage);
+            $result = $twilioService->sendWhatsAppMessage($outgoingMessage->phone, $outgoingMessage->message);
 
             $this->info("Message sent successfully!");
             $this->info("Twilio Message SID: {$result->twilio_message_sid}");

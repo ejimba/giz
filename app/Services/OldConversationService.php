@@ -8,7 +8,7 @@ use App\Models\Prompt;
 use App\Models\Response;
 use Illuminate\Support\Facades\Log;
 
-class ConversationService
+class OldConversationService
 {
     /**
      * Start a new conversation with a client
