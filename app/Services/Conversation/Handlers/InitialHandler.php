@@ -45,6 +45,20 @@ class InitialHandler extends BaseStepHandler implements StepHandlerInterface
                     'step' => Step::STOCK_PRODUCT_SELECTION,
                 ]);
                 break;
+            case '3':
+                $this->transitionTo($conv, Step::ADD_CUSTOMER_MENU, [
+                    'flow_type' => 'add_customer',
+                    'prompt_sent' => true,
+                    'step' => Step::ADD_CUSTOMER_MENU,
+                ]);
+                break;
+            case '4':
+                $this->transitionTo($conv, Step::ADD_STAFF_MENU, [
+                    'flow_type' => 'add_staff',
+                    'prompt_sent' => true,
+                    'step' => Step::ADD_STAFF_MENU,
+                ]);
+                break;
             default:
                 $this->sendMenu($conv);
                 break;
@@ -52,16 +66,13 @@ class InitialHandler extends BaseStepHandler implements StepHandlerInterface
     }
 
     private function sendMenu(Conversation $conv): void
-    {
-        $menuPrompt = Prompt::where('active', true)
-            ->where('title', 'Sales Menu')
-            ->first();
-            
-        $menuText = $menuPrompt ? $menuPrompt->content : 
-                   "Welcome! Please select an option:\n\n" .
+    {       
+        $menuText = "Welcome! Please select an option:\n\n" .
                    "1. Record a Sale\n" .
-                   "2. Check Stock Availability\n\n" .
-                   "Reply with 1 or 2";
+                   "2. Check Stock Availability\n" .
+                   "3. Add New Customer\n" .
+                   "4. Add New Staff\n\n" .
+                   "Reply with a number 1-4";
                    
         $this->twilio->sendWhatsAppMessage(
             $conv->client->phone,

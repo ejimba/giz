@@ -25,6 +25,13 @@ class Step
     public const NEW_CUSTOMER_PHONE = 'new_customer_phone';
     public const HANDLE_CUSTOMER_CREATION_ERROR = 'handle_customer_creation_error';
     
+    public const NEW_STAFF_NAME = 'new_staff_name';
+    public const NEW_STAFF_PHONE = 'new_staff_phone';
+    public const HANDLE_STAFF_CREATION_ERROR = 'handle_staff_creation_error';
+    
+    public const ADD_CUSTOMER_MENU = 'add_customer_menu';
+    public const ADD_STAFF_MENU = 'add_staff_menu';
+    
     public static function getNavigationMap(): array
     {
         return [
@@ -47,6 +54,13 @@ class Step
             self::NEW_CUSTOMER_NAME => self::CUSTOMER_SELECTION,
             self::NEW_CUSTOMER_PHONE => self::NEW_CUSTOMER_NAME,
             self::HANDLE_CUSTOMER_CREATION_ERROR => self::NEW_CUSTOMER_PHONE,
+            
+            self::ADD_CUSTOMER_MENU => self::INITIAL,
+            self::ADD_STAFF_MENU => self::INITIAL,
+            
+            self::NEW_STAFF_NAME => self::ADD_STAFF_MENU,
+            self::NEW_STAFF_PHONE => self::NEW_STAFF_NAME,
+            self::HANDLE_STAFF_CREATION_ERROR => self::NEW_STAFF_PHONE,
         ];
     }
 }

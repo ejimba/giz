@@ -22,6 +22,11 @@ use App\Services\Conversation\Handlers\StockResultHandler;
 use App\Services\Conversation\Handlers\NewCustomerNameHandler;
 use App\Services\Conversation\Handlers\NewCustomerPhoneHandler;
 use App\Services\Conversation\Handlers\CustomerErrorHandler;
+use App\Services\Conversation\Handlers\AddCustomerMenuHandler;
+use App\Services\Conversation\Handlers\AddStaffMenuHandler;
+use App\Services\Conversation\Handlers\NewStaffNameHandler;
+use App\Services\Conversation\Handlers\NewStaffPhoneHandler;
+use App\Services\Conversation\Handlers\StaffErrorHandler;
 use Illuminate\Support\ServiceProvider;
 
 class ConversationServiceProvider extends ServiceProvider
@@ -50,6 +55,12 @@ class ConversationServiceProvider extends ServiceProvider
                 $app->make(NewCustomerNameHandler::class),
                 $app->make(NewCustomerPhoneHandler::class),
                 $app->make(CustomerErrorHandler::class),
+                
+                $app->make(AddCustomerMenuHandler::class),
+                $app->make(AddStaffMenuHandler::class),
+                $app->make(NewStaffNameHandler::class),
+                $app->make(NewStaffPhoneHandler::class),
+                $app->make(StaffErrorHandler::class),
             ];
             $service = new ConversationService(
                 $app->make(NavigationService::class),

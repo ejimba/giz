@@ -78,6 +78,16 @@ class EndevStovesService
         throw new \Exception("Failed to create customer: " . $response->body());
     }
 
+    public function createStaff($staffData)
+    {
+        $response = Http::withToken($this->getApiToken())
+            ->post($this->apiUrl . '/staff/create/', $staffData);
+        if ($response->successful()) {
+            return $response->json();
+        }
+        throw new \Exception("Failed to create staff: " . $response->body());
+    }
+
     public function createSale($saleData)
     {
         $response = Http::withToken($this->getApiToken())
